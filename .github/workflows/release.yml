@@ -25,6 +25,14 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     
+    - name: Install CMake
+      uses: lukka/get-cmake@latest
+      with:
+        version: "4.0.0"
+
+    - name: Verify CMake version
+      run: cmake --version
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
