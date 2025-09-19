@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "nuitka"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "AMCL"
+version = "0.1.0"
+description = "A Minecraft Launcher"
+authors = "hmr-BH and contributors"
+
+dependencies = [
+    "loguru >= 0.7",
+    "PySide6 >= 6.5.0",
+]
+
+[tool.nuitka]
+enable-plugin = ["pyside6"]
+standalone = true
+show-progress = true
+show-memory = true
