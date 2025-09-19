@@ -5,7 +5,7 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
-  workflow_dispatch:  # 允许手动触发工作流
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,106 +14,53 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10']
-        exclude:
-          - os: macos-latest
-            python-version: '3.8'  # 排除某些组合
+        python-version: ['3.12', '3.11', '3.10']
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-        cache: 'pip'
     
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install nuitka PySide6
         
-    - name: Create assets directory structure
-      run: |
-        mkdir -p amcl/assets/img/logo
-        # 这里可以添加一些默认资源文件，如果项目中没有的话
-        # 或者确保你的项目已经包含了所有必要的资源文件
-        
     - name: Build with Nuitka
       run: |
-        # 基础Nuitka命令
-        NUITKA_CMD="python -m nuitka \
-          -oAMCL \
-          --standalone \
-          --lto=yes \
-          --disable-ccache \
-          --include-data-dir=amcl/assets=assets \
-          --enable-plugin=pyside6 \
-          --jobs=2 \
-          --output-dir=build \
-          --remove-output \
-          --assume-yes-for-downloads \
-          amcl/src/amcl.py"
-        
-        # 根据平台添加特定参数
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          NUITKA_CMD="$NUITKA_CMD --mingw64 --windows-console-mode=disable"
-          # 假设图标文件存在
-          if [ -f "amcl/assets/img/logo/icon.ico" ]; then
-            NUITKA_CMD="$NUITKA_CMD --windows-icon-from-ico=amcl/assets/img/logo/icon.ico"
-          fi
-        elif [ "$RUNNER_OS" == "macOS" ]; then
-          NUITKA_CMD="$NUITKA_CMD --macos-create-app-bundle"
-          if [ -f "amcl/assets/img/logo/icon-256x.png" ]; then
-            NUITKA_CMD="$NUITKA_CMD --macos-app-icon=amcl/assets/img/logo/icon-256x.png"
-          fi
-        else  # Linux
-          if [ -f "amcl/assets/img/logo/icon-256x.png" ]; then
-            NUITKA_CMD="$NUITKA_CMD --linux-icon=amcl/assets/img/logo/icon-256x.png"
-          fi
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads --mingw64 --windows-console-mode=disable amcl/src/amcl.py
+        elif [ "$RUNNER_OS" = "macOS" ]; then
+          python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads --macos-create-app-bundle amcl/src/amcl.py
+        else
+          python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads amcl/src/amcl.py
         fi
         
-        echo "Running: $NUITKA_CMD"
-        eval $NUITKA_CMD
-        
-    - name: Setup Visual Studio (Windows only)
+    - name: Setup MSVC on Windows
       if: matrix.os == 'windows-latest'
-      uses: ilammy/setup-msvc@v1
-      with:
-        arch: x64
-        
-    - name: Build launcher (Windows only)
+      uses: microsoft/setup-msbuild@v1
+      
+    - name: Build launcher on Windows
       if: matrix.os == 'windows-latest'
       run: |
-        # 创建构建目录
-        mkdir -p launcher/cmake-build-release
-        
-        # 配置CMake
-        cmake -S launcher -B launcher/cmake-build-release -DCMAKE_BUILD_TYPE=Release
-        
-        # 构建项目
-        cmake --build launcher/cmake-build-release --target AMCL -j 2
+        mkdir -p launcher/build
+        cd launcher/build
+        cmake ..
+        cmake --build . --config Release -j 2
         
     - name: Package artifacts
       run: |
-        # 创建分发目录
         mkdir -p dist
-        
-        # 移动Nuitka构建结果
         if [ -d "build" ]; then
           mv build dist/amcl
-        fi
-        
-        # 移动启动器（Windows）
-        if [ "$RUNNER_OS" == "Windows" ] && [ -f "launcher/cmake-build-release/AMCL.exe" ]; then
-          mkdir -p dist/launcher
-          mv launcher/cmake-build-release/AMCL.exe dist/launcher/
         fi
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.os }}-python${{ matrix.python-version }}-build
+        name: ${{ matrix.os }}-python${{ matrix.python-version }}
         path: dist/
-        if-no-files-found: error
