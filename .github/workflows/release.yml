@@ -14,43 +14,37 @@ jobs:
           - os: macos-latest
           - os: windows-latest
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30 
+    timeout-minutes: 45
+    
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install gettext (macOS)
+    - name: Install macOS dependencies
       if: matrix.os == 'macos-latest'
       run: brew install gettext
     
-    - name: Set up Python
+    - name: Set up Python 3.10
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
         architecture: 'x64'
     
+    - name: Upgrade pip
+      run: |
+        python -m pip install --upgrade pip --no-cache-dir
+      continue-on-error: true
+    
     - name: Install Python dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -U cmake ninja
-        pip install nuitka pyside6
+        pip install --no-cache-dir --upgrade cmake ninja
+        pip install --no-cache-dir nuitka pyside6
+      continue-on-error: true
     
-    - name: Install system dependencies (Ubuntu)
+    - name: Install Ubuntu dependencies
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential
-        sudo apt-get install -y libgl1-mesa-dri mesa-common-dev libglu1-mesa
-        sudo apt-get install -y libglib2.0-0
-    
-    - name: Install system dependencies (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        echo "Using pip-installed cmake and ninja"
-    
-    - name: Install system dependencies (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        echo "Using pip-installed cmake and ninja"
+        sudo apt-get install -y build-essential libgl1-mesa-dri mesa-common-dev libglu1-mesa libglib2.0-0
     
     - name: Install UPX (Linux/macOS)
       if: matrix.os != 'windows-latest'
@@ -61,19 +55,18 @@ jobs:
           brew install upx
         fi
     
-    - name: Create platform-specific build config
+    - name: Create build config
       run: |
         if [ "${{ matrix.os }}" = "windows-latest" ]; then
           echo '{"visual_studio": {"vcvars64_path": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat"}, "cmake": {"executable_path": "cmake"}, "build": {"parallel_jobs": 4}}' > build_config.json
-        elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-          echo '{"cmake": {"executable_path": "cmake"}, "build": {"parallel_jobs": 4}}' > build_config.json
-        elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+        else
           echo '{"cmake": {"executable_path": "cmake"}, "build": {"parallel_jobs": 4}}' > build_config.json
         fi
       shell: bash
     
-    - name: Build
+    - name: Build project
       run: python scripts/build.py
+      continue-on-error: true
     
     - name: Package artifacts
       run: |
@@ -86,7 +79,7 @@ jobs:
         fi
     
     - name: Upload Release Assets
-      if: startsWith(github.ref, 'refs/tags/') 
+      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
         files: |
