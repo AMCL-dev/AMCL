@@ -14,44 +14,58 @@ jobs:
           - os: macos-latest
           - os: windows-latest
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 60
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install macOS dependencies
+    - name: Install and link gettext (macOS)
       if: matrix.os == 'macos-latest'
-      run: brew install gettext
+      run: |
+        brew install gettext
+        brew link --force gettext
     
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v4
       with:
         python-version: '3.10'
         architecture: 'x64'
     
     - name: Install UV
       run: |
-        pip install --no-cache-dir uv
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          powershell -Command "irm https://astral.sh/uv/install.sh | iex"
+          echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        else
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          source $HOME/.cargo/env
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        fi
+      shell: bash
+    
+    - name: Verify UV installation
+      run: uv --version
     
     - name: Install project dependencies
-      run: |
-        uv sync --no-dev
-      continue-on-error: true
+      run: uv sync --no-dev
     
     - name: Install Ubuntu dependencies
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libgl1-mesa-dri mesa-common-dev libglu1-mesa libglib2.0-0
+        sudo apt-get install -y build-essential
+        sudo apt-get install -y libgl1-mesa-dri mesa-common-dev libglu1-mesa
+        sudo apt-get install -y libglib2.0-0
+        sudo apt-get install -y upx
     
-    - name: Install UPX (Linux/macOS)
-      if: matrix.os != 'windows-latest'
+    - name: Install macOS dependencies
+      if: matrix.os == 'macos-latest'
+      run: brew install upx
+    
+    - name: Install Windows dependencies
+      if: matrix.os == 'windows-latest'
       run: |
-        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-          sudo apt-get install -y upx
-        elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-          brew install upx
-        fi
+        uv pip install cmake ninja
     
     - name: Create build config
       run: |
@@ -64,7 +78,6 @@ jobs:
     
     - name: Build project
       run: uv run python scripts/build.py
-      continue-on-error: true
     
     - name: Package artifacts
       run: |
