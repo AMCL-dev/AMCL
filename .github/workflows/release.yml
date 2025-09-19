@@ -32,13 +32,14 @@ jobs:
         
     - name: Build with Nuitka
       run: |
-        if [ "$RUNNER_OS" = "Windows" ]; then
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
           python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads --mingw64 --windows-console-mode=disable amcl/src/amcl.py
-        elif [ "$RUNNER_OS" = "macOS" ]; then
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
           python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads --macos-create-app-bundle amcl/src/amcl.py
         else
           python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads amcl/src/amcl.py
         fi
+      shell: bash
         
     - name: Setup MSVC on Windows
       if: matrix.os == 'windows-latest'
@@ -51,6 +52,7 @@ jobs:
         cd launcher/build
         cmake ..
         cmake --build . --config Release -j 2
+      shell: bash
         
     - name: Package artifacts
       run: |
@@ -58,6 +60,7 @@ jobs:
         if [ -d "build" ]; then
           mv build dist/amcl
         fi
+      shell: bash
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
