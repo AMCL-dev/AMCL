@@ -1,113 +1,119 @@
-name: Build and Release
+name: Build Application
 
 on:
   push:
-    branches: [ "**" ]
-    tags: [ "v*" ]
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:  # 允许手动触发工作流
 
 jobs:
   build:
+    runs-on: ${{ matrix.os }}
+    
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.8', '3.9', '3.10']
+        exclude:
           - os: macos-latest
-          - os: windows-latest
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+            python-version: '3.8'  # 排除某些组合
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Handle gettext (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        brew unlink gettext && brew link --force gettext || true
-    
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
-        architecture: 'x64'
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install nuitka PySide6
         
-    - name: Install UV (Windows)
-      if: matrix.os == 'windows-latest'
-      run: pip install uv
-    
-    - name: Install UV (Linux/macOS)
-      if: matrix.os != 'windows-latest'
+    - name: Create assets directory structure
       run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        source $HOME/.cargo/env
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-    
-    - name: Verify UV installation
-      run: uv --version
-    
-    - name: Fix pyproject.toml authors field
-      if: matrix.os == 'ubuntu-latest'
+        mkdir -p amcl/assets/img/logo
+        # 这里可以添加一些默认资源文件，如果项目中没有的话
+        # 或者确保你的项目已经包含了所有必要的资源文件
+        
+    - name: Build with Nuitka
       run: |
-        # Backup original file
-        cp pyproject.toml pyproject.toml.backup
-        # Fix authors field to be an array
-        sed -i 's/authors = "hmr-BH and contributors"/authors = [{name = "hmr-BH and contributors"}]/' pyproject.toml
-    
-    - name: Install project dependencies
-      run: uv sync --no-dev
-    
-    - name: Restore original pyproject.toml
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        mv pyproject.toml.backup pyproject.toml
-    
-    - name: Install Ubuntu dependencies
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential
-        sudo apt-get install -y libgl1-mesa-dri mesa-common-dev libglu1-mesa
-        sudo apt-get install -y libglib2.0-0
-        sudo apt-get install -y upx
-    
-    - name: Install macOS dependencies
-      if: matrix.os == 'macos-latest'
-      run: brew install upx
-    
-    - name: Install Windows dependencies
-      if: matrix.os == 'windows-latest'
-      run: |
-        uv pip install cmake ninja
-    
-    - name: Create build config
-      run: |
-        if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          echo '{"visual_studio": {"vcvars64_path": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat"}, "cmake": {"executable_path": "cmake"}, "build": {"parallel_jobs": 4}}' > build_config.json
-        else
-          echo '{"cmake": {"executable_path": "cmake"}, "build": {"parallel_jobs": 4}}' > build_config.json
+        # 基础Nuitka命令
+        NUITKA_CMD="python -m nuitka \
+          -oAMCL \
+          --standalone \
+          --lto=yes \
+          --disable-ccache \
+          --include-data-dir=amcl/assets=assets \
+          --enable-plugin=pyside6 \
+          --jobs=2 \
+          --output-dir=build \
+          --remove-output \
+          --assume-yes-for-downloads \
+          amcl/src/amcl.py"
+        
+        # 根据平台添加特定参数
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          NUITKA_CMD="$NUITKA_CMD --mingw64 --windows-console-mode=disable"
+          # 假设图标文件存在
+          if [ -f "amcl/assets/img/logo/icon.ico" ]; then
+            NUITKA_CMD="$NUITKA_CMD --windows-icon-from-ico=amcl/assets/img/logo/icon.ico"
+          fi
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          NUITKA_CMD="$NUITKA_CMD --macos-create-app-bundle"
+          if [ -f "amcl/assets/img/logo/icon-256x.png" ]; then
+            NUITKA_CMD="$NUITKA_CMD --macos-app-icon=amcl/assets/img/logo/icon-256x.png"
+          fi
+        else  # Linux
+          if [ -f "amcl/assets/img/logo/icon-256x.png" ]; then
+            NUITKA_CMD="$NUITKA_CMD --linux-icon=amcl/assets/img/logo/icon-256x.png"
+          fi
         fi
-      shell: bash
-    
-    - name: Build project
-      run: uv run python scripts/build.py
-    
+        
+        echo "Running: $NUITKA_CMD"
+        eval $NUITKA_CMD
+        
+    - name: Setup Visual Studio (Windows only)
+      if: matrix.os == 'windows-latest'
+      uses: ilammy/setup-msvc@v1
+      with:
+        arch: x64
+        
+    - name: Build launcher (Windows only)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # 创建构建目录
+        mkdir -p launcher/cmake-build-release
+        
+        # 配置CMake
+        cmake -S launcher -B launcher/cmake-build-release -DCMAKE_BUILD_TYPE=Release
+        
+        # 构建项目
+        cmake --build launcher/cmake-build-release --target AMCL -j 2
+        
     - name: Package artifacts
       run: |
-        if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          mv dist/amcl dist/AMCL-Windows-x64
-        elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-          mv dist/amcl dist/AMCL-Linux-x64
-        elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-          mv dist/amcl dist/AMCL-macOS-x64
+        # 创建分发目录
+        mkdir -p dist
+        
+        # 移动Nuitka构建结果
+        if [ -d "build" ]; then
+          mv build dist/amcl
         fi
-    
-    - name: Upload Release Assets
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+        
+        # 移动启动器（Windows）
+        if [ "$RUNNER_OS" == "Windows" ] && [ -f "launcher/cmake-build-release/AMCL.exe" ]; then
+          mkdir -p dist/launcher
+          mv launcher/cmake-build-release/AMCL.exe dist/launcher/
+        fi
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
       with:
-        files: |
-          dist/AMCL-Windows-x64/**
-          dist/AMCL-Linux-x64/**
-          dist/AMCL-macOS-x64/**
-        draft: false
-        prerelease: false
-        generate_release_notes: true
+        name: ${{ matrix.os }}-python${{ matrix.python-version }}-build
+        path: dist/
+        if-no-files-found: error
