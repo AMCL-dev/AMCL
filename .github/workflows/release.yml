@@ -14,30 +14,15 @@ jobs:
           - os: macos-latest
           - os: windows-latest
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
     - uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: '3.10'
         architecture: 'x64'
-    
-    - name: Install system dependencies (Ubuntu)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential libgl1-mesa-glx libglib2.0-0
-    
-    - name: Install system dependencies (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        brew install cmake ninja
-    
-    - name: Install system dependencies (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        choco install cmake ninja
     
     - name: Install Python dependencies
       run: |
@@ -45,13 +30,32 @@ jobs:
         pip install -U cmake ninja
         pip install nuitka pyside6
     
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+        sudo apt-get install -y libgl1-mesa-dri mesa-common-dev libglu1-mesa
+        sudo apt-get install -y libglib2.0-0
+    
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        echo "Using pip-installed cmake and ninja"
+    
+    - name: Install system dependencies (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        echo "Using pip-installed cmake and ninja"
+    
     - name: Install UPX (Linux/macOS)
       if: matrix.os != 'windows-latest'
       run: |
         if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
           sudo apt-get install -y upx
         elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-          brew install upx
+          # 使用pip安装的ninja，避免brew安装
+          echo "Using pip-installed ninja"
         fi
     
     - name: Create platform-specific build config
