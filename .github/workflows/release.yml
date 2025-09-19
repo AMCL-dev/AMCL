@@ -19,35 +19,46 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install and link gettext (macOS)
+    - name: Handle gettext (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        brew install gettext
-        brew link --force gettext
+        brew unlink gettext && brew link --force gettext || true
     
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
         architecture: 'x64'
+        
+    - name: Install UV (Windows)
+      if: matrix.os == 'windows-latest'
+      run: pip install uv
     
-    - name: Install UV
+    - name: Install UV (Linux/macOS)
+      if: matrix.os != 'windows-latest'
       run: |
-        if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          powershell -Command "irm https://astral.sh/uv/install.sh | iex"
-          echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        else
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          source $HOME/.cargo/env
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-        fi
-      shell: bash
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        source $HOME/.cargo/env
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
     
     - name: Verify UV installation
       run: uv --version
     
+    - name: Fix pyproject.toml authors field
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        # Backup original file
+        cp pyproject.toml pyproject.toml.backup
+        # Fix authors field to be an array
+        sed -i 's/authors = "hmr-BH and contributors"/authors = [{name = "hmr-BH and contributors"}]/' pyproject.toml
+    
     - name: Install project dependencies
       run: uv sync --no-dev
+    
+    - name: Restore original pyproject.toml
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        mv pyproject.toml.backup pyproject.toml
     
     - name: Install Ubuntu dependencies
       if: matrix.os == 'ubuntu-latest'
