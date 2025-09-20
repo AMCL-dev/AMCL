@@ -21,7 +21,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive'  # 添加此行以递归初始化所有submodule
+          submodules: 'recursive'
+      - name: Copy WinToast headers into src
+        run: |
+          cp -r AMCL/launcher/WinToast/include/* AMCL/launcher/WinToast/src/
+        shell: bash
 
       - name: Set up Python
         uses: actions/setup-python@v5
