@@ -9,12 +9,13 @@ on:
 
 jobs:
   build:
-    timeout-minutes: 60 
+    timeout-minutes: 120  # 增加超时时间到2小时
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.10']
+      fail-fast: false  # 即使一个作业失败，其他作业也会继续运行
 
     steps:
       - name: Checkout code
@@ -28,7 +29,7 @@ jobs:
       - name: Install CMake
         uses: lukka/get-cmake@latest
         with:
-          version: "3.30.0"
+          cmakeVersion: "3.30.0"  # 修复参数名
 
       - name: Install system dependencies
         run: |
@@ -36,8 +37,8 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y libgtk-3-dev libnotify-dev libsecret-1-dev libx11-dev
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            brew update
-            brew install pkg-config
+            # 在 macOS 上安装 CoreFoundation 开发包
+            xcode-select --install 2>/dev/null || true
           fi
         shell: bash
 
@@ -74,13 +75,14 @@ jobs:
       - name: Build with Nuitka
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads --mingw64 --windows-console-mode=disable amcl/src/amcl.py
+            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads --mingw64 --windows-console-mode=disable amcl/src/amcl.py
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads --macos-create-app-bundle amcl/src/amcl.py
+            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads --macos-create-app-bundle amcl/src/amcl.py
           else
-            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads amcl/src/amcl.py
+            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads amcl/src/amcl.py
           fi
         shell: bash
+        timeout-minutes: 60  # 为 Nuitka 步骤单独设置超时
 
       - name: Setup MSVC on Windows
         if: matrix.os == 'windows-latest'
@@ -93,6 +95,9 @@ jobs:
           
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             cmake .. -DCMAKE_PREFIX_PATH=../../vcpkg_installed/x64-windows
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            # 在 macOS 上，添加 CoreFoundation 框架链接
+            cmake .. -DSKIP_WINTOAST=ON -DCMAKE_EXE_LINKER_FLAGS="-framework CoreFoundation"
           else
             cmake .. -DSKIP_WINTOAST=ON
           fi
