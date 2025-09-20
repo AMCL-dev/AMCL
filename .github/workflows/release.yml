@@ -41,42 +41,6 @@ jobs:
           fi
         shell: bash
 
-      - name: Install WinToast (Windows only)
-        if: matrix.os == 'windows-latest'
-        run: |
-          git clone https://github.com/mohabouje/WinToast.git
-          cd WinToast
-          mkdir build
-          cd build
-          cmake .. -DCMAKE_INSTALL_PREFIX=../../winToast_install
-          cmake --build . --config Release
-          cmake --install .
-          
-          # 创建 WinToast 的 CMake 配置文件
-          mkdir -p ../../winToast_install/share/unofficial-wintoast
-          cat > ../../winToast_install/share/unofficial-wintoast/unofficial-wintoast-config.cmake << 'EOF'
-          # WinToast 配置文件
-          include(CMakeFindDependencyMacro)
-          
-          # 创建导入目标
-          if(NOT TARGET unofficial::wintoast::wintoast)
-              add_library(unofficial::wintoast::wintoast INTERFACE IMPORTED)
-              set_target_properties(unofficial::wintoast::wintoast PROPERTIES
-                INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../include"
-                INTERFACE_LINK_LIBRARIES "${CMAKE_CURRENT_LIST_DIR}/../../lib/wintoast.lib"
-              )
-          endif()
-          
-          # 提供包信息
-          set(unofficial-wintoast_FOUND TRUE)
-          set(unofficial-wintoast_VERSION "1.2.0")
-          EOF
-          
-          # 输出安装内容以供调试
-          echo "WinToast 安装内容:"
-          find ../../winToast_install -type f -name "*.lib" -o -name "*.h" -o -name "*.cmake"
-        shell: bash
-
       - name: Install dependencies
         run: |
           pip install nuitka PySide6
@@ -101,16 +65,7 @@ jobs:
         run: |
           mkdir -p launcher/build
           cd launcher/build
-          
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            # 设置 CMAKE_PREFIX_PATH 包含 WinToast 安装目录
-            export CMAKE_PREFIX_PATH="../../winToast_install;${CMAKE_PREFIX_PATH}"
-            echo "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}"
-            cmake .. -DCMAKE_PREFIX_PATH="../../winToast_install"
-          else
-            cmake .. -DSKIP_WINTOAST=ON
-          fi
-          
+
           cmake --build . --config Release -j 2
         shell: bash
 
