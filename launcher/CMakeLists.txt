@@ -31,6 +31,11 @@ find_package(unofficial-wintoast CONFIG REQUIRED)
 target_link_libraries(AMCL PRIVATE unofficial::wintoast::wintoast)
 endif()
 
+if(APPLE)
+    find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+    target_link_libraries(AMCL PRIVATE ${COREFOUNDATION_LIBRARY})
+endif()
+
 target_include_directories(AMCL PRIVATE
         include
 )
