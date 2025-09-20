@@ -1,0 +1,3 @@
+[submodule "launcher/WinToast"]
+	path = launcher/WinToast
+	url = https://github.com/mohabouje/WinToast.git
