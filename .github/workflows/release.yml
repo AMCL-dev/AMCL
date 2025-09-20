@@ -9,13 +9,13 @@ on:
 
 jobs:
   build:
-    timeout-minutes: 120  # 增加超时时间到2小时
+    timeout-minutes: 120 
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.10']
-      fail-fast: false  # 即使一个作业失败，其他作业也会继续运行
+      fail-fast: false 
 
     steps:
       - name: Checkout code
@@ -82,7 +82,7 @@ jobs:
             python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads amcl/src/amcl.py
           fi
         shell: bash
-        timeout-minutes: 60  # 为 Nuitka 步骤单独设置超时
+        timeout-minutes: 60 
 
       - name: Setup MSVC on Windows
         if: matrix.os == 'windows-latest'
@@ -96,7 +96,6 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             cmake .. -DCMAKE_PREFIX_PATH=../../vcpkg_installed/x64-windows
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            # 在 macOS 上，添加 CoreFoundation 框架链接
             cmake .. -DSKIP_WINTOAST=ON -DCMAKE_EXE_LINKER_FLAGS="-framework CoreFoundation"
           else
             cmake .. -DSKIP_WINTOAST=ON
