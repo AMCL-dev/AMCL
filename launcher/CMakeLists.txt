@@ -14,6 +14,7 @@ if(WIN32)
     add_executable(AMCL WIN32
             main.cpp
             platform.cpp
+            WinToast/src/wintoastlib.cpp
     )
 
     set_target_properties(AMCL PROPERTIES
@@ -24,11 +25,6 @@ else()
             main.cpp
             platform.cpp
     )
-endif()
-
-if(WIN32)
-find_package(unofficial-wintoast CONFIG REQUIRED)
-target_link_libraries(AMCL PRIVATE unofficial::wintoast::wintoast)
 endif()
 
 if(APPLE)

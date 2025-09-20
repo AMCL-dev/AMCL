@@ -11,7 +11,7 @@
 #ifdef _WIN32
     #include <windows.h>
     #include <shlobj.h>
-    #include <wintoastlib.h>
+    #include "WinToast/include/wintoastlib.h"
     using namespace WinToastLib;
 #elif __APPLE__
     #include <TargetConditionals.h>
