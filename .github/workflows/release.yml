@@ -1,113 +1,123 @@
-name: Build and Release
+name: Build Application
 
 on:
   push:
-    branches: [ "**" ]
-    tags: [ "v*" ]
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
 
 jobs:
   build:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-          - os: macos-latest
-          - os: windows-latest
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.12', '3.11', '3.10']
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Handle gettext (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        brew unlink gettext && brew link --force gettext || true
-    
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-        architecture: 'x64'
-        
-    - name: Install UV (Windows)
-      if: matrix.os == 'windows-latest'
-      run: pip install uv
-    
-    - name: Install UV (Linux/macOS)
-      if: matrix.os != 'windows-latest'
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        source $HOME/.cargo/env
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-    
-    - name: Verify UV installation
-      run: uv --version
-    
-    - name: Fix pyproject.toml authors field
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        # Backup original file
-        cp pyproject.toml pyproject.toml.backup
-        # Fix authors field to be an array
-        sed -i 's/authors = "hmr-BH and contributors"/authors = [{name = "hmr-BH and contributors"}]/' pyproject.toml
-    
-    - name: Install project dependencies
-      run: uv sync --no-dev
-    
-    - name: Restore original pyproject.toml
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        mv pyproject.toml.backup pyproject.toml
-    
-    - name: Install Ubuntu dependencies
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential
-        sudo apt-get install -y libgl1-mesa-dri mesa-common-dev libglu1-mesa
-        sudo apt-get install -y libglib2.0-0
-        sudo apt-get install -y upx
-    
-    - name: Install macOS dependencies
-      if: matrix.os == 'macos-latest'
-      run: brew install upx
-    
-    - name: Install Windows dependencies
-      if: matrix.os == 'windows-latest'
-      run: |
-        uv pip install cmake ninja
-    
-    - name: Create build config
-      run: |
-        if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          echo '{"visual_studio": {"vcvars64_path": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat"}, "cmake": {"executable_path": "cmake"}, "build": {"parallel_jobs": 4}}' > build_config.json
-        else
-          echo '{"cmake": {"executable_path": "cmake"}, "build": {"parallel_jobs": 4}}' > build_config.json
-        fi
-      shell: bash
-    
-    - name: Build project
-      run: uv run python scripts/build.py
-    
-    - name: Package artifacts
-      run: |
-        if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          mv dist/amcl dist/AMCL-Windows-x64
-        elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-          mv dist/amcl dist/AMCL-Linux-x64
-        elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-          mv dist/amcl dist/AMCL-macOS-x64
-        fi
-    
-    - name: Upload Release Assets
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          dist/AMCL-Windows-x64/**
-          dist/AMCL-Linux-x64/**
-          dist/AMCL-macOS-x64/**
-        draft: false
-        prerelease: false
-        generate_release_notes: true
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+        with:
+          version: "3.30.0"
+
+      - name: Install system dependencies
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y libgtk-3-dev libnotify-dev libsecret-1-dev libx11-dev
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew update
+            brew install pkg-config
+          fi
+        shell: bash
+
+      - name: Install WinToast (Windows only)
+        if: matrix.os == 'windows-latest'
+        run: |
+          git clone https://github.com/mohabouje/WinToast.git
+          cd WinToast
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=../../vcpkg_installed/x64-windows
+          cmake --build . --config Release
+          cmake --install .
+          
+          mkdir -p ../../vcpkg_installed/x64-windows/share/unofficial-wintoast
+          cat > ../../vcpkg_installed/x64-windows/share/unofficial-wintoast/unofficial-wintoast-config.cmake << 'EOF'
+          include(CMakeFindDependencyMacro)
+          find_dependency(unofficial-wintoast REQUIRED)
+          
+          if(NOT TARGET unofficial::wintoast::wintoast)
+              add_library(unofficial::wintoast::wintoast INTERFACE IMPORTED)
+              set_target_properties(unofficial::wintoast::wintoast PROPERTIES
+                  INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../include"
+                  INTERFACE_LINK_LIBRARIES "${CMAKE_CURRENT_LIST_DIR}/../../lib/wintoast.lib"
+              )
+          endif()
+          EOF
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nuitka PySide6
+
+      - name: Build with Nuitka
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads --mingw64 --windows-console-mode=disable amcl/src/amcl.py
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads --macos-create-app-bundle amcl/src/amcl.py
+          else
+            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=2 --output-dir=build --remove-output --assume-yes-for-downloads amcl/src/amcl.py
+          fi
+        shell: bash
+
+      - name: Setup MSVC on Windows
+        if: matrix.os == 'windows-latest'
+        uses: microsoft/setup-msbuild@v1
+
+      - name: Build launcher
+        run: |
+          mkdir -p launcher/build
+          cd launcher/build
+          
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cmake .. -DCMAKE_PREFIX_PATH=../../vcpkg_installed/x64-windows
+          else
+            cmake .. -DSKIP_WINTOAST=ON
+          fi
+          
+          cmake --build . --config Release -j 2
+        shell: bash
+
+      - name: Package artifacts
+        run: |
+          mkdir -p dist
+          if [ -d "build" ]; then
+            mv build dist/amcl
+          fi
+          
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            mkdir -p dist/launcher
+            cp launcher/build/Release/AMCL.exe dist/launcher/ 2>/dev/null || cp launcher/build/AMCL dist/launcher/
+          else
+            mkdir -p dist/launcher
+            cp launcher/build/AMCL dist/launcher/
+          fi
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-python${{ matrix.python-version }}
+          path: dist/
