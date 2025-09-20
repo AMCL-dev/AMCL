@@ -26,8 +26,10 @@ else()
     )
 endif()
 
+if(WIN32)
 find_package(unofficial-wintoast CONFIG REQUIRED)
 target_link_libraries(AMCL PRIVATE unofficial::wintoast::wintoast)
+endif()
 
 target_include_directories(AMCL PRIVATE
         include
