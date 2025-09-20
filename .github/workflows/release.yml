@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'  # 添加此行以递归初始化所有submodule
 
       - name: Set up Python
         uses: actions/setup-python@v5
