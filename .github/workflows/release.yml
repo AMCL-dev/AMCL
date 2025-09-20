@@ -29,7 +29,7 @@ jobs:
       - name: Install CMake
         uses: lukka/get-cmake@latest
         with:
-          cmakeVersion: "3.30.0"
+          cmakeVersion: "4.0.0"
 
       - name: Install system dependencies
         run: |
