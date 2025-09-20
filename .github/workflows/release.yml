@@ -23,20 +23,25 @@ jobs:
         with:
           submodules: 'recursive'
 
-      - name: Copy WinToast headers
+      - name: Copy WinToast headers into src
         run: |
-          # Find WinToast directory and copy headers to src
-          WINTOAST=$(find . -type d -name WinToast -print -quit)
-          if [ -n "$WINTOAST" ] && [ -d "$WINTOAST/include" ]; then
-            if [[ "$RUNNER_OS" == "Windows" ]]; then
-              # Windows copy command
-              xcopy /E /Y "$WINTOAST\\include\\*" "$WINTOAST\\src\\"
-            else
-              # Unix copy command
+          # 查找 WinToast 目录
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            # Windows 系统使用不同的查找方式
+            for /r %%i in (WinToast) do if exist "%%i" set WINTOAST=%%i
+            if defined WINTOAST (
+              if exist "%WINTOAST%\include" (
+                xcopy /E /Y "%WINTOAST%\include\*" "%WINTOAST%\src\"
+              )
+            )
+          else
+            # Linux/macOS 系统
+            WINTOAST=$(find . -type d -name WinToast -print -quit)
+            if [[ -n "$WINTOAST" && -d "$WINTOAST/include" ]]; then
               cp -r "$WINTOAST/include/"* "$WINTOAST/src/"
             fi
           fi
-        shell: bash
+        shell: cmd
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -54,10 +59,12 @@ jobs:
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             xcode-select --install 2>/dev/null || true
           fi
+        shell: bash
 
       - name: Install dependencies
         run: |
           pip install nuitka PySide6
+        shell: bash
 
       - name: Build with Nuitka
         run: |
@@ -68,6 +75,7 @@ jobs:
           else
             python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads amcl/src/amcl.py
           fi
+        shell: bash
         timeout-minutes: 60
 
       - name: Setup MSVC on Windows
@@ -79,13 +87,16 @@ jobs:
           mkdir -p launcher/build
           cd launcher/build
           
+          # 添加CMake配置步骤
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             cmake .. -G "Visual Studio 17 2022" -A x64
           else
             cmake ..
           fi
           
+          # 然后构建项目
           cmake --build . --config Release -j 2
+        shell: bash
 
       - name: Package artifacts
         run: |
@@ -94,12 +105,14 @@ jobs:
             mv build dist/amcl
           fi
           
-          mkdir -p dist/launcher
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cp launcher/build/Release/AMCL.exe dist/launcher/ 2>/dev/null || cp launcher/build/AMCL.exe dist/launcher/
+            mkdir -p dist/launcher
+            cp launcher/build/Release/AMCL.exe dist/launcher/ 2>/dev/null || cp launcher/build/AMCL dist/launcher/
           else
+            mkdir -p dist/launcher
             cp launcher/build/AMCL dist/launcher/
           fi
+        shell: bash
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
