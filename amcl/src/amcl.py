@@ -1,7 +1,7 @@
 import sys
 
 from PySide6.QtWidgets import QApplication
-from amcl.ui.mainwindow import MainWindow
+from amcl.ui.window.main_window import MainWindow
 
 
 def main():

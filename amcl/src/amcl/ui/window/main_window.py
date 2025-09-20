@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt, QRect, QPoint
 from PySide6.QtWidgets import QMainWindow, QTextEdit
 from amcl.ui.components.titlebar import TitleBar
 from amcl.ui.utils.frameless_helper import FramelessHelper
+from amcl.ui.window.dev_window import DevWindow
 
 
 class MainWindow(QMainWindow):
@@ -23,3 +24,6 @@ class MainWindow(QMainWindow):
         self.title_bar.close_clicked.connect(self.close)
 
         self.frameless_helper = FramelessHelper(self, border=6)
+
+        self.dev = DevWindow()
+        self.dev.show()
