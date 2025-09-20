@@ -22,11 +22,22 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+
       - name: Copy WinToast headers into src
         run: |
-          cp -r AMCL/launcher/WinToast/include/* AMCL/launcher/WinToast/src/
-        shell: bash
+          set -euo pipefail
+          WINTOAST=$(find . -type d -name WinToast -print -quit)
+          if [[ -z "$WINTOAST" ]]; then
+              exit 1
+          fi
 
+          if [[ ! -d "$WINTOAST/include" ]]; then
+              exit 0
+          fi
+
+          rsync -av --ignore-existing "$WINTOAST/include/" "$WINTOAST/src/"
+        shell: bash
+        
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
