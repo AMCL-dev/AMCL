@@ -23,22 +23,25 @@ jobs:
         with:
           submodules: 'recursive'
 
-      - name: Copy WinToast headers into src
+      - name: Copy WinToast headers (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            for /r %%i in (WinToast) do if exist "%%i" set WINTOAST=%%i
-            if defined WINTOAST (
-              if exist "%WINTOAST%\include" (
-                xcopy /E /Y "%WINTOAST%\include\*" "%WINTOAST%\src\"
-              )
+          for /r %%i in (WinToast) do if exist "%%i" set WINTOAST=%%i
+          if defined WINTOAST (
+            if exist "!WINTOAST!\include" (
+              xcopy /E /Y "!WINTOAST!\include\*" "!WINTOAST!\src\"
             )
-          else
-            WINTOAST=$(find . -type d -name WinToast -print -quit)
-            if [[ -n "$WINTOAST" && -d "$WINTOAST/include" ]]; then
-              cp -r "$WINTOAST/include/"* "$WINTOAST/src/"
-            fi
-          fi
+          )
         shell: cmd
+
+      - name: Copy WinToast headers (Non-Windows)
+        if: matrix.os != 'windows-latest'
+        run: |
+          WINTOAST=$(find . -type d -name WinToast -print -quit)
+          if [[ -n "$WINTOAST" && -d "$WINTOAST/include" ]]; then
+            cp -r "$WINTOAST/include/"* "$WINTOAST/src/"
+          fi
+        shell: bash
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -49,6 +52,7 @@ jobs:
         uses: lukka/get-cmake@latest
 
       - name: Install system dependencies
+        if: matrix.os != 'windows-latest'
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             sudo apt-get update
@@ -100,11 +104,10 @@ jobs:
             mv build dist/amcl
           fi
           
+          mkdir -p dist/launcher
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            mkdir -p dist/launcher
-            cp launcher/build/Release/AMCL.exe dist/launcher/ 2>/dev/null || cp launcher/build/AMCL dist/launcher/
+            cp launcher/build/Release/AMCL.exe dist/launcher/ 2>/dev/null || cp launcher/build/AMCL.exe dist/launcher/
           else
-            mkdir -p dist/launcher
             cp launcher/build/AMCL dist/launcher/
           fi
         shell: bash
