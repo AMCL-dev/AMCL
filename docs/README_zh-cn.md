@@ -2,9 +2,9 @@
 
 <div align="center">
 <img src="../logo.png" width="200" height="200"  alt="logo"/>
-<br>
+<br><br>
 <strong>简体中文</strong> | <a href="../README.md">English</a>
-<br>
+<br><br>
 
 ![STARS](https://img.shields.io/github/stars/AMCL-dev/AMCL?color=yellow&label=GitHub%20Stars )
 [![LICENSE](https://img.shields.io/badge/LICENSE-EPLV2-default )](https://github.com/AMCL-dev/AMCL/blob/main/LICENSE )
