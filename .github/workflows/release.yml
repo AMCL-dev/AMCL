@@ -34,11 +34,11 @@ jobs:
       - name: Build with Nuitka
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads --mingw64 --windows-console-mode=disable amcl/src/amcl.py
+            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads --mingw64 --windows-console-mode=disable amcl/src/main.py
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads --macos-create-app-bundle amcl/src/amcl.py
+            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads --macos-create-app-bundle amcl/src/main.py
           else
-            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads amcl/src/amcl.py
+            python -m nuitka -oAMCL --standalone --lto=yes --disable-ccache --include-data-dir=amcl/assets=assets --enable-plugin=pyside6 --jobs=1 --output-dir=build --remove-output --assume-yes-for-downloads amcl/src/main.py
           fi
         shell: bash
         timeout-minutes: 60
