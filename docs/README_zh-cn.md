@@ -1,7 +1,7 @@
 # Astra Minecraft Launcher
 
 <div align="center">
-<img src="docs/assets/logo.png" width="200" height="200"  alt="logo"/>
+<img src="../logo.png" width="200" height="200"  alt="logo"/>
 <br>
 <strong>简体中文</strong> | <a href="../README.md">English</a>
 <br>
