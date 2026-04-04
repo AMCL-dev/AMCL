@@ -1,0 +1,40 @@
+
+export component IconButton {
+    in property <image> icon <=> i-icon.source;
+    in property <brush> background: transparent;
+    in property <brush> color: white;
+    in property <length> icon-size: 20px;
+
+    callback clicked();
+
+    width: 30px;
+    height: 30px;
+
+    i-container := Rectangle {
+        background: root.background;
+        border-radius: max(self.width, self.height) / 2;
+
+        // 鼠标悬停效果
+        states [
+            hover when i-touch-area.has-hover: {
+                background: root.background.darker(10%);
+            }
+            pressed when i-touch-area.pressed: {
+                background: root.background.darker(20%);
+            }
+        ]
+
+        i-icon := Image {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: root.icon-size;
+            height: root.icon-size;
+            colorize: root.color;
+            image-fit: contain;
+        }
+
+        i-touch-area := TouchArea {
+            clicked => { root.clicked(); }
+        }
+    }
+}

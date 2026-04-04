@@ -1,0 +1,47 @@
+import { Button } from "std-widgets.slint";
+import { IconButton } from "components/icon_button.slint";
+import { DragArea } from "components/drag_area.slint";
+
+export component AppWindow inherits Window {
+    height: 500px;
+    width: 800px;
+
+    no-frame: true;
+    background: transparent;
+
+    callback move-window(length, length);
+    callback close_window();
+
+    DragArea {
+        on-move-window(offset-x, offset-y) => {
+            move-window(offset-x, offset-y);
+        }
+    }
+    
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: white;
+        border-radius: 8px;
+    }
+
+    VerticalLayout {
+        spacing: 5px;
+        HorizontalLayout {
+            height: 50px;
+            spacing: 10px;
+            padding: 5px;
+            alignment: end;
+
+            IconButton {
+                icon: @image-url("assets/icons/close.svg");
+                background: transparent;
+                color: black;
+                clicked => { 
+                    debug("关闭按钮被点击"); 
+                    close_window()
+                }
+            }
+        }
+    }
+}
