@@ -2,6 +2,7 @@ import { Button } from "std-widgets.slint";
 import { IconButton } from "components/icon_button.slint";
 import { DragArea } from "components/drag_area.slint";
 import { Background } from "components/background.slint";
+import { TitleBar } from "components/titlebar.slint";
 
 export component AppWindow inherits Window {
     height: 500px;
@@ -20,32 +21,14 @@ export component AppWindow inherits Window {
         }
     }
     
-    Background {}
-
-    VerticalLayout {
-        HorizontalLayout {
-            height: 50px;
-            spacing: 24px;
-            padding: 14px;
-            alignment: end;
-            IconButton {
-                icon: @image-url("assets/icons/minimize.svg");
-                background: transparent;
-                color: whitesmoke;
-                clicked => {
-                    debug("最小化按钮被点击");
-                    minimize_window();
-                }
-            }
-            IconButton {
-                icon: @image-url("assets/icons/close.svg");
-                background: transparent;
-                color: whitesmoke;
-                clicked => { 
-                    debug("关闭按钮被点击"); 
-                    close_window()
-                }
-            }
+    TitleBar {
+        close_window => {
+            close_window();
+        }
+        minimize_window => {
+            minimize_window();
         }
     }
+
+    Background {}
 }

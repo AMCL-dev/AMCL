@@ -1,0 +1,36 @@
+import { AboutSlint, VerticalBox } from "std-widgets.slint";
+import { IconButton } from "icon_button.slint";
+
+export component TitleBar {
+    callback close_window();
+    callback minimize_window();
+    
+    VerticalLayout {
+        alignment: end;
+        HorizontalLayout {
+            height: 50px;
+            spacing: 24px;
+            padding: 14px;
+            alignment: end;
+            IconButton {
+                icon: @image-url("../assets/icons/minimize.svg");
+                background: transparent;
+                color: whitesmoke;
+                clicked => {
+                    debug("最小化按钮被点击");
+                    minimize_window();
+                }
+            }
+            IconButton {
+                icon: @image-url("../assets/icons/close.svg");
+                background: transparent;
+                color: whitesmoke;
+                clicked => {
+                    debug("关闭按钮被点击");
+                    close_window()
+                }
+            }
+        }
+    }
+    
+}
