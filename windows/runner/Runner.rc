@@ -91,7 +91,6 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "AMCL-dev" "\0"
             VALUE "FileDescription", "Astra Minecraft Launcher" "\0"
-            VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "AMCL" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 AMCL-dev" "\0"
             VALUE "OriginalFilename", "AMCL.exe" "\0"
