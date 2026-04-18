@@ -10,7 +10,7 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    if: startsWith(github.event.head_commit.message, 'ci:')
+    if: startsWith(github.event.head_commit.message, 'ci:') || startsWith(github.event.head_commit.message, 'ci-')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,18 +26,52 @@ jobs:
       - name: Build Windows executable
         run: flutter build windows --release
 
-      - name: Download & install Enigma Virtual Box
+      - name: Download Enigma Virtual Box installer
         run: |
           curl -L -o enigmavb.exe https://enigmaprotector.com/assets/files/enigmavb.exe
-          .\enigmavb.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\EnigmaVB"
+
+      - name: Install Enigma Virtual Box (silent, default location)
+        run: |
+          .\enigmavb.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+
+      - name: Find evb.exe path
+        id: find_evb
+        run: |
+          $paths = @(
+            "C:\Program Files\Enigma Virtual Box\evb.exe",
+            "C:\Program Files (x86)\Enigma Virtual Box\evb.exe",
+            "${env:ProgramFiles}\Enigma Virtual Box\evb.exe"
+          )
+          $evbPath = $null
+          foreach ($p in $paths) {
+            if (Test-Path $p) {
+              $evbPath = $p
+              break
+            }
+          }
+          if (-not $evbPath) {
+            $whereResult = where.exe evb.exe 2>$null
+            if ($whereResult) { $evbPath = $whereResult[0] }
+          }
+          if (-not $evbPath) {
+            Write-Error "evb.exe not found"
+            exit 1
+          }
+          Write-Output "EVB_PATH=$evbPath"
+          echo "EVB_PATH=$evbPath" >> $env:GITHUB_ENV
 
       - name: Run Enigma Virtual Box
         run: |
-          & "C:\EnigmaVB\evb.exe" "${{ github.workspace }}\package.windows.evb" /build
+          & "$env:EVB_PATH" "${{ github.workspace }}\package.windows.evb" /build
 
       - name: Rename output to AMCL.exe
         run: |
-          Move-Item -Path "${{ github.workspace }}\build\amcl_boxed.exe" -Destination "${{ github.workspace }}\AMCL.exe" -Force
+          if (Test-Path "${{ github.workspace }}\build\amcl_boxed.exe") {
+            Move-Item -Path "${{ github.workspace }}\build\amcl_boxed.exe" -Destination "${{ github.workspace }}\AMCL.exe" -Force
+          } else {
+            Write-Error "Output amcl_boxed.exe not found at build\amcl_boxed.exe"
+            exit 1
+          }
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -47,7 +81,7 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
-    if: startsWith(github.event.head_commit.message, 'ci-')
+    if: startsWith(github.event.head_commit.message, 'ci:') || startsWith(github.event.head_commit.message, 'ci-')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -82,7 +116,7 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
-    if: startsWith(github.event.head_commit.message, 'ci-')
+    if: startsWith(github.event.head_commit.message, 'ci:') || startsWith(github.event.head_commit.message, 'ci-')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -108,7 +142,7 @@ jobs:
           chmod +x appimagetool-x86_64.AppImage
           sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
 
-      - name: Install linuxdeploy (optional, but helps)
+      - name: Install linuxdeploy
         run: |
           wget -c "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
           chmod +x linuxdeploy-x86_64.AppImage
@@ -124,9 +158,7 @@ jobs:
         run: |
           mkdir -p AppDir/usr/bin
           cp build/linux/x64/release/bundle/amcl AppDir/usr/bin/
-          # 复制其他资源
           cp -r build/linux/x64/release/bundle/* AppDir/usr/bin/ 2>/dev/null || true
-          # 创建 .desktop 文件
           cat > AppDir/amcl.desktop <<EOF
           [Desktop Entry]
           Name=AMCL
@@ -139,7 +171,8 @@ jobs:
       - name: Build AppImage
         run: |
           linuxdeploy --appdir AppDir --output appimage
-          mv AMCL*.AppImage AMCL.AppImage
+          # linuxdeploy 默认输出类似 AMCL_*.AppImage，统一重命名
+          mv AMCL*.AppImage AMCL.AppImage 2>/dev/null || mv *.AppImage AMCL.AppImage
 
       - name: Build .deb package with fpm
         run: |
