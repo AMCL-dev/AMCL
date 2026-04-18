@@ -1,0 +1,169 @@
+name: CI Package
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    if: startsWith(github.event.head_commit.message, 'ci:')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter (latest stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows executable
+        run: flutter build windows --release
+
+      - name: Download & install Enigma Virtual Box
+        run: |
+          curl -L -o enigmavb.exe https://enigmaprotector.com/assets/files/enigmavb.exe
+          .\enigmavb.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\EnigmaVB"
+
+      - name: Run Enigma Virtual Box
+        run: |
+          & "C:\EnigmaVB\evb.exe" "${{ github.workspace }}\package.windows.evb" /build
+
+      - name: Rename output to AMCL.exe
+        run: |
+          Move-Item -Path "${{ github.workspace }}\build\amcl_boxed.exe" -Destination "${{ github.workspace }}\AMCL.exe" -Force
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: ${{ github.workspace }}\AMCL.exe
+
+  build-macos:
+    runs-on: macos-latest
+    if: startsWith(github.event.head_commit.message, 'ci-')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter (latest stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build macOS app
+        run: flutter build macos --release
+
+      - name: Rename .app to AMCL.app
+        run: |
+          mv build/macos/Build/Products/Release/amcl.app build/macos/Build/Products/Release/AMCL.app
+
+      - name: Package as DMG
+        run: |
+          brew install create-dmg
+          create-dmg --volname "AMCL" --window-pos 200 120 --window-size 800 400 \
+            --icon-size 100 --app-drop-link 600 185 \
+            "AMCL.dmg" "build/macos/Build/Products/Release/AMCL.app"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-package
+          path: AMCL.dmg
+
+  build-linux:
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.head_commit.message, 'ci-')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter (latest stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+                                  dpkg rpm file
+
+      - name: Install fpm (to create deb/rpm)
+        run: |
+          gem install --no-document fpm
+
+      - name: Install appimagetool
+        run: |
+          wget -c "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool-x86_64.AppImage
+          sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
+
+      - name: Install linuxdeploy (optional, but helps)
+        run: |
+          wget -c "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
+          chmod +x linuxdeploy-x86_64.AppImage
+          sudo mv linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Linux executable
+        run: flutter build linux --release
+
+      - name: Prepare AppDir structure for AppImage
+        run: |
+          mkdir -p AppDir/usr/bin
+          cp build/linux/x64/release/bundle/amcl AppDir/usr/bin/
+          # 复制其他资源
+          cp -r build/linux/x64/release/bundle/* AppDir/usr/bin/ 2>/dev/null || true
+          # 创建 .desktop 文件
+          cat > AppDir/amcl.desktop <<EOF
+          [Desktop Entry]
+          Name=AMCL
+          Exec=amcl
+          Icon=amcl
+          Type=Application
+          Categories=Utility;
+          EOF
+
+      - name: Build AppImage
+        run: |
+          linuxdeploy --appdir AppDir --output appimage
+          mv AMCL*.AppImage AMCL.AppImage
+
+      - name: Build .deb package with fpm
+        run: |
+          mkdir -p deb_package/usr/local/bin
+          cp build/linux/x64/release/bundle/amcl deb_package/usr/local/bin/AMCL
+          chmod +x deb_package/usr/local/bin/AMCL
+          fpm -s dir -t deb -n amcl -v 1.0.0 --description "AMCL Application" \
+            -C deb_package .
+          mv amcl_1.0.0_amd64.deb AMCL.deb
+
+      - name: Build .rpm package with fpm
+        run: |
+          mkdir -p rpm_package/usr/local/bin
+          cp build/linux/x64/release/bundle/amcl rpm_package/usr/local/bin/AMCL
+          chmod +x rpm_package/usr/local/bin/AMCL
+          fpm -s dir -t rpm -n amcl -v 1.0.0 --description "AMCL Application" \
+            -C rpm_package .
+          mv amcl-1.0.0-1.x86_64.rpm AMCL.rpm
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            AMCL.AppImage
+            AMCL.deb
+            AMCL.rpm
